@@ -180,6 +180,13 @@ function buildMap() {
     .attr("width", "150%")
     .attr("height", "150%");
   globe.append("feGaussianBlur").attr("stdDeviation", 16);
+  const handleDots = defs.append("pattern")
+    .attr("id", "handle-dots")
+    .attr("width", 4.5)
+    .attr("height", 4.5)
+    .attr("patternUnits", "userSpaceOnUse");
+  handleDots.append("rect").attr("width", 4.5).attr("height", 4.5).attr("fill", "#fff");
+  handleDots.append("circle").attr("cx", 2.25).attr("cy", 2.25).attr("r", 1.05).attr("fill", "#c23b33");
   view.globeShadow = svg.append("path").attr("class", "globe-shadow").attr("filter", "url(#globe-shadow)");
   view.sphere = svg.append("path").attr("class", "sphere").attr("fill", "url(#sea-texture)");
   view.graticule = svg.append("path").attr("class", "graticule");
@@ -188,6 +195,11 @@ function buildMap() {
   view.coastline = svg.append("path").attr("class", "coastline");
   view.truths = svg.append("g").attr("class", "truth-layer");
   view.pieces = svg.append("g").attr("class", "piece-layer");
+  view.handle = view.pieces.append("g").attr("class", "piece-handle").attr("display", "none");
+  view.handle.append("line").attr("class", "handle-stem");
+  view.handle.append("circle").attr("class", "handle-knob");
+  view.handle.append("circle").attr("class", "handle-hit");
+  view.handle.on("pointerdown", onHandlePointerDown);
   view.arcs = svg.append("g").attr("class", "arc-layer");
   view.graticuleDatum = d3.geoGraticule().step([15, 15]);
 }
@@ -256,8 +268,11 @@ function safeInset(edge) {
 
 function viewInsets() {
   if (!isCompact()) return { top: 28, right: 28, bottom: 28, left: 28 };
+  // The play card covers the top of the screen. The Americas run into it,
+  // so that frame alone sits lower and keeps the north of the continent clear.
+  const top = game.modeId === "americas" ? 148 + safeInset("top") : 16 + safeInset("top");
   return {
-    top: 16 + safeInset("top"),
+    top,
     right: 12,
     bottom: 16 + safeInset("bottom"),
     left: 12,
@@ -341,6 +356,8 @@ function frameScale(box, insets) {
     if (fits(mid)) lo = mid;
     else hi = mid;
   }
+  // The fitted Asia frame fills the phone width and leaves the countries small.
+  if (isCompact() && game.modeId === "asia") return lo * 1.22;
   return lo;
 }
 
@@ -436,6 +453,7 @@ function drawPieces() {
     .attr("pointer-events", solution ? "none" : null)
     .attr("d", placedPath)
     .on("pointerdown", onPiecePointerDown);
+  updateHandle();
 }
 
 function drawTruths() {
@@ -517,58 +535,55 @@ function placedPath(item) {
 
 function placedFeature(feature, centroid, lonlat) {
   if (!lonlat || d3.geoDistance(centroid, lonlat) < 1e-8) return feature;
-  const quat = quaternionBetween(centroid, lonlat);
+  const rotate = northRotation(centroid, lonlat);
   return {
     type: "Feature",
     properties: feature.properties,
     geometry: {
       type: "MultiPolygon",
       coordinates: polygonParts(feature).map((polygon) => (
-        polygon.map((ring) => ring.map((point) => rotateLonLat(point, quat)))
+        polygon.map((ring) => ring.map(rotate))
       )),
     },
   };
 }
 
-function quaternionBetween(from, to) {
-  const a = lonLatToVec(from);
-  const b = lonLatToVec(to);
-  const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
-  let x = a[1] * b[2] - a[2] * b[1];
-  let y = a[2] * b[0] - a[0] * b[2];
-  let z = a[0] * b[1] - a[1] * b[0];
-  const len = Math.hypot(x, y, z);
-  if (len < 1e-8) {
-    if (dot > 0) return [1, 0, 0, 0];
-    const pivot = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-    x = a[1] * pivot[2] - a[2] * pivot[1];
-    y = a[2] * pivot[0] - a[0] * pivot[2];
-    z = a[0] * pivot[1] - a[1] * pivot[0];
-    const axis = Math.hypot(x, y, z) || 1;
-    return [0, x / axis, y / axis, z / axis];
-  }
-  x /= len;
-  y /= len;
-  z /= len;
-  const half = Math.atan2(len, dot) / 2;
-  const s = Math.sin(half);
-  return [Math.cos(half), x * s, y * s, z * s];
+function northRotation(from, to) {
+  const source = tangentFrame(from);
+  const target = tangentFrame(to);
+  return (point) => {
+    const vector = lonLatToVec(point);
+    const east = dot(source.east, vector);
+    const north = dot(source.north, vector);
+    const radial = dot(source.radial, vector);
+    const rotated = [
+      target.east[0] * east + target.north[0] * north + target.radial[0] * radial,
+      target.east[1] * east + target.north[1] * north + target.radial[1] * radial,
+      target.east[2] * east + target.north[2] * north + target.radial[2] * radial,
+    ];
+    return [
+      Math.atan2(rotated[1], rotated[0]) * 180 / Math.PI,
+      Math.asin(Math.max(-1, Math.min(1, rotated[2]))) * 180 / Math.PI,
+    ];
+  };
 }
 
-function rotateLonLat(point, quat) {
-  const v = lonLatToVec(point);
-  const [w, x, y, z] = quat;
-  const tx = 2 * (y * v[2] - z * v[1]);
-  const ty = 2 * (z * v[0] - x * v[2]);
-  const tz = 2 * (x * v[1] - y * v[0]);
-  const rotated = [
-    v[0] + w * tx + (y * tz - z * ty),
-    v[1] + w * ty + (z * tx - x * tz),
-    v[2] + w * tz + (x * ty - y * tx),
-  ];
-  const lon = Math.atan2(rotated[1], rotated[0]) * 180 / Math.PI;
-  const lat = Math.asin(Math.max(-1, Math.min(1, rotated[2]))) * 180 / Math.PI;
-  return [lon, lat];
+function tangentFrame(point) {
+  const lon = point[0] * Math.PI / 180;
+  const lat = point[1] * Math.PI / 180;
+  const cosLat = Math.cos(lat);
+  const sinLat = Math.sin(lat);
+  const cosLon = Math.cos(lon);
+  const sinLon = Math.sin(lon);
+  return {
+    east: [-sinLon, cosLon, 0],
+    north: [-sinLat * cosLon, -sinLat * sinLon, cosLat],
+    radial: [cosLat * cosLon, cosLat * sinLon, sinLat],
+  };
+}
+
+function dot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
 function lonLatToVec(point) {
@@ -594,7 +609,7 @@ function updateDock() {
   els.dockSvg.setAttribute("viewBox", "0 0 168 108");
   els.dockPath.setAttribute("d", round.silhouette);
   els.dockHint.classList.remove("is-name");
-  els.dockHint.textContent = "Glissez-la sur la carte.";
+  els.dockHint.textContent = isCompact() ? "Tenez la poignée." : "Glissez-la sur la carte.";
 }
 
 function currentRound() {
@@ -770,12 +785,28 @@ function totalKm() {
   return game.results.reduce((sum, result) => sum + result.km, 0);
 }
 
+const HANDLE_STEM = 62;
+const HANDLE_RADIUS = 16;
+
 function onDockPointerDown(event) {
   if (game.phase !== "play" || event.button > 0) return;
+  if (isCompact() && !event.target.closest(".dock-handle")) return;
   const round = currentRound();
   if (!round) return;
   event.preventDefault();
-  beginDrag(event, [0, 0], true);
+  beginDrag(event, [0, isCompact() ? HANDLE_STEM + HANDLE_RADIUS + 48 : 0], true);
+}
+
+function onHandlePointerDown(event) {
+  if (!isCompact() || game.phase !== "play" || event.button > 0) return;
+  const round = currentRound();
+  if (!round || !round.placed) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const screen = pointerInMap(event);
+  const placed = view.projection(round.lonlat);
+  if (!placed) return;
+  beginDrag(event, [screen[0] - placed[0], screen[1] - placed[1]], false);
 }
 
 function onPiecePointerDown(event, item) {
@@ -847,22 +878,77 @@ function endDrag() {
 }
 
 function movePiece(screen) {
+  if (!commitPiece(screen)) return;
+  if (isCompact()) fitHandleLift(screen);
+  updateHandle();
+}
+
+function commitPiece(screen) {
   const round = currentRound();
   const drag = game.drag;
-  if (!round || !drag) return;
+  if (!round || !drag) return false;
   const target = [screen[0] - drag.grab[0], screen[1] - drag.grab[1]];
   const lonlat = view.projection.invert(target);
-  if (!lonlat || !Number.isFinite(lonlat[0]) || !Number.isFinite(lonlat[1])) return;
+  if (!lonlat || !Number.isFinite(lonlat[0]) || !Number.isFinite(lonlat[1])) return false;
   const back = view.projection(lonlat);
-  if (!back || Math.hypot(back[0] - target[0], back[1] - target[1]) > 12) return;
+  if (!back || Math.hypot(back[0] - target[0], back[1] - target[1]) > 12) return false;
   const d = view.path(placedFeature(round.feature, round.centroid, lonlat));
-  if (!d) return;
+  if (!d) return false;
   round.lonlat = lonlat;
   round.placed = true;
   els.validate.disabled = false;
   const path = view.pieces.select("path.piece");
   if (path.empty()) drawPieces();
   else path.attr("d", d);
+  return true;
+}
+
+function fitHandleLift(screen) {
+  const drag = game.drag;
+  const round = currentRound();
+  const node = view.pieces.select("path.piece").node();
+  const center = round && view.projection(round.lonlat);
+  if (!drag || !node || !center) return;
+  const box = node.getBBox();
+  const lift = box.y + box.height - center[1] + HANDLE_STEM + HANDLE_RADIUS;
+  if (Math.abs(drag.grab[1] - lift) <= 1.5) return;
+  drag.grab[1] = lift;
+  commitPiece(screen);
+}
+
+function updateHandle() {
+  const handle = view.handle;
+  if (!handle) return;
+  const round = currentRound();
+  const show = isCompact() && game.phase === "play" && round && round.placed;
+  if (!show) {
+    handle.attr("display", "none");
+    return;
+  }
+  const center = view.projection(round.lonlat);
+  const node = view.pieces.select("path.piece").node();
+  if (!center || !node) {
+    handle.attr("display", "none");
+    return;
+  }
+  const box = node.getBBox();
+  const x = center[0];
+  const knobY = box.y + box.height + HANDLE_STEM + HANDLE_RADIUS;
+  handle.attr("display", null);
+  handle.select(".handle-stem")
+    .attr("x1", x)
+    .attr("y1", box.y + box.height + 2)
+    .attr("x2", x)
+    .attr("y2", knobY - HANDLE_RADIUS);
+  handle.select(".handle-knob")
+    .attr("cx", x)
+    .attr("cy", knobY)
+    .attr("r", HANDLE_RADIUS);
+  handle.select(".handle-hit")
+    .attr("cx", x)
+    .attr("cy", knobY)
+    .attr("r", 28);
+  handle.raise();
 }
 
 function clearPlacement(round) {

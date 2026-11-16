@@ -104,6 +104,32 @@ button { font: inherit; }
 
 body.is-dragging .piece { cursor: grabbing; }
 
+@media (max-width: 640px) {
+  body.is-playing .piece { pointer-events: none; }
+}
+
+.piece-handle { cursor: grab; touch-action: none; }
+
+.handle-stem {
+  stroke: var(--red);
+  stroke-width: 2.6px;
+  stroke-linecap: round;
+  stroke-dasharray: 0.01 6.5;
+  pointer-events: none;
+}
+
+.handle-knob {
+  fill: url(#handle-dots);
+  stroke: var(--red-deep);
+  stroke-width: 1.25px;
+  filter: url(#piece-shadow);
+  pointer-events: none;
+}
+
+.handle-hit { fill: transparent; }
+
+body.is-dragging .piece-handle { cursor: grabbing; }
+
 .truth {
   fill: #d8d1c7;
   stroke: #b7afa4;
@@ -796,6 +822,8 @@ body.is-review .dock-svg {
   color: var(--ink);
 }
 
+.dock-handle { display: none; }
+
 .finish-card { width: min(460px, 100%); }
 
 .final-score-kicker {
@@ -954,9 +982,43 @@ body.is-review .dock-svg {
   #piece-dock {
     width: min(248px, calc(100vw - 24px));
     padding: 8px 12px 10px;
+    cursor: default;
   }
 
   .dock-svg { height: 84px; }
+
+  .dock-handle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 44px;
+    margin: 2px auto 0;
+    padding-bottom: 2px;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .dock-handle-stem {
+    width: 6px;
+    height: 26px;
+    background-color: transparent;
+    background-image: radial-gradient(circle, var(--red) 1.2px, transparent 1.4px);
+    background-size: 6px 6.5px;
+    background-repeat: repeat-y;
+    background-position: center top;
+  }
+
+  .dock-handle-knob {
+    width: 36px;
+    height: 36px;
+    border: 1.25px solid var(--red-deep);
+    border-radius: 50%;
+    background-color: #fff;
+    background-image: radial-gradient(circle, var(--red) 1.05px, transparent 1.25px);
+    background-size: 4.5px 4.5px;
+    background-position: center;
+    box-shadow: 0 1px 1.4px rgba(28, 25, 21, 0.28);
+  }
 
   .intro-card { padding: 16px 16px 14px; }
   .intro-card h1 { font-size: 28px; }

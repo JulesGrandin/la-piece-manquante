@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>La pièce manquante</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="is-intro">
   <div id="load-overlay" role="status" aria-live="polite" aria-busy="true" aria-label="Chargement">
@@ -74,6 +74,10 @@
     <svg id="dock-svg" class="dock-svg" viewBox="0 0 168 108" aria-hidden="true">
       <path id="dock-path"></path>
     </svg>
+    <div class="dock-handle" aria-hidden="true">
+      <span class="dock-handle-stem"></span>
+      <span class="dock-handle-knob"></span>
+    </div>
     <p class="dock-hint" id="dock-hint">Glissez-la sur la carte.</p>
   </div>
 
@@ -110,6 +114,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
