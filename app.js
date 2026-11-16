@@ -843,7 +843,7 @@ function onPointerMove(event) {
     drag.moved = true;
     if (drag.fromDock) els.dock.hidden = true;
   }
-  if (!drag.fromDock || drag.moved) movePiece(screen);
+  if ((!drag.fromDock || drag.moved) && movePiece(screen)) drag.tracked = true;
 }
 
 function onPointerUp(event) {
@@ -855,7 +855,9 @@ function onPointerUp(event) {
     if (Math.hypot(screen[0] - drag.origin[0], screen[1] - drag.origin[1]) >= 6) {
       drag.moved = true;
       if (drag.fromDock) els.dock.hidden = true;
-      movePiece(screen);
+      // A thumb rolls upward as it leaves the glass, so the release point
+      // sits a few pixels above the last place the piece was held.
+      if (!drag.tracked) movePiece(screen);
     }
   }
   if (round && drag.fromDock && !drag.moved) clearPlacement(round);
@@ -878,9 +880,10 @@ function endDrag() {
 }
 
 function movePiece(screen) {
-  if (!commitPiece(screen)) return;
+  if (!commitPiece(screen)) return false;
   if (isCompact()) fitHandleLift(screen);
   updateHandle();
+  return true;
 }
 
 function commitPiece(screen) {
