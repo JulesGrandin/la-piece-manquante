@@ -590,6 +590,23 @@ body.is-dragging .piece-handle { cursor: grabbing; }
   box-shadow: none;
 }
 
+.validate-float {
+  position: fixed;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  margin: 0;
+  padding: 0 11px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.validate-float[hidden] { display: none !important; }
+
 .btn-secondary {
   border: 1px solid var(--line);
   border-radius: 8px;

@@ -69,6 +69,7 @@ async function init() {
   els.prompt = document.getElementById("round-prompt");
   els.target = document.getElementById("target-label");
   els.validate = document.getElementById("btn-validate");
+  els.validateFloat = document.getElementById("btn-validate-float");
   els.result = document.getElementById("result");
   els.resultScore = document.getElementById("result-score");
   els.finalScore = document.getElementById("final-score");
@@ -90,6 +91,7 @@ async function init() {
   document.getElementById("btn-map").addEventListener("click", showMyMap);
   document.getElementById("btn-back").addEventListener("click", showScore);
   els.validate.addEventListener("click", validatePlacement);
+  els.validateFloat.addEventListener("click", validatePlacement);
   document.querySelector("[data-hard]").addEventListener("change", onHardChange);
   els.scoreInfo.addEventListener("click", toggleScorePop);
   els.dock.addEventListener("pointerdown", onDockPointerDown);
@@ -454,6 +456,7 @@ function drawPieces() {
     .attr("d", placedPath)
     .on("pointerdown", onPiecePointerDown);
   updateHandle();
+  placeValidateFloat();
 }
 
 function drawTruths() {
@@ -830,6 +833,7 @@ function beginDrag(event, grab, fromDock) {
     origin: screen,
   };
   document.body.classList.add("is-dragging");
+  placeValidateFloat();
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerUp);
@@ -952,6 +956,58 @@ function updateHandle() {
     .attr("cy", knobY)
     .attr("r", 28);
   handle.raise();
+}
+
+function placeValidateFloat() {
+  const button = els.validateFloat;
+  if (!button) return;
+  const round = currentRound();
+  const node = view.pieces && view.pieces.select("path.piece").node();
+  const show = game.phase === "play" && round && round.placed && !game.drag && node;
+  if (!show) {
+    button.hidden = true;
+    return;
+  }
+  const box = node.getBBox();
+  const x = box.x + box.width / 2;
+  button.hidden = false;
+  const width = button.offsetWidth || 72;
+  const height = button.offsetHeight || 26;
+  const gap = 14;
+  let belowTop = box.y + box.height;
+  if (isCompact() && view.handle && view.handle.attr("display") !== "none") {
+    const cy = Number(view.handle.select(".handle-knob").attr("cy"));
+    const radius = Number(view.handle.select(".handle-knob").attr("r")) || HANDLE_RADIUS;
+    if (Number.isFinite(cy)) belowTop = Math.max(belowTop, cy + radius);
+  }
+  const above = [x, box.y - gap - height / 2];
+  const below = [x, belowTop + gap + height / 2];
+  const mapRect = view.svg.node().getBoundingClientRect();
+  const blocked = (point) => {
+    const left = mapRect.left + point[0] - width / 2;
+    const top = mapRect.top + point[1] - height / 2;
+    const rect = { left, top, right: left + width, bottom: top + height };
+    if (rect.left < 8 || rect.top < 8 || rect.right > window.innerWidth - 8 || rect.bottom > window.innerHeight - 8) return true;
+    return [els.chrome, els.historyWrap, els.dock].some((panel) => {
+      if (!panel || panel.hidden) return false;
+      const bounds = panel.getBoundingClientRect();
+      if (bounds.width < 1 || bounds.height < 1) return false;
+      return rect.right > bounds.left && rect.left < bounds.right && rect.bottom > bounds.top && rect.top < bounds.bottom;
+    });
+  };
+  const room = (point) => Math.min(
+    point[0] - width / 2,
+    view.width - point[0] - width / 2,
+    point[1] - height / 2,
+    view.height - point[1] - height / 2,
+  );
+  const spot = [above, below].sort((a, b) => {
+    const overlap = Number(blocked(a)) - Number(blocked(b));
+    if (overlap) return overlap;
+    return room(b) - room(a);
+  })[0];
+  button.style.left = (mapRect.left + spot[0]) + "px";
+  button.style.top = (mapRect.top + spot[1]) + "px";
 }
 
 function clearPlacement(round) {

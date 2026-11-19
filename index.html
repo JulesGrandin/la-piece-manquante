@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>La pièce manquante</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body class="is-intro">
   <div id="load-overlay" role="status" aria-live="polite" aria-busy="true" aria-label="Chargement">
@@ -20,7 +20,7 @@
   <div id="intro-modal" class="intro-modal" role="dialog" aria-modal="true" aria-labelledby="intro-title">
     <div class="intro-card">
       <h1 id="intro-title">La pièce manquante</h1>
-      <p class="lead">Remettez le pays manquant à sa place.<br>La pièce est à l'échelle. Les frontières, non.</p>
+      <p class="lead">Remettez le pays manquant à sa place.</p>
       <p class="field-label">Carte</p>
       <div class="region-switch" role="group" aria-label="Carte">
         <button type="button" data-mode="europe" aria-pressed="true">Europe</button>
@@ -92,6 +92,8 @@
     </div>
   </div>
 
+  <button type="button" id="btn-validate-float" class="btn-primary validate-float" hidden>Valider</button>
+
   <div id="map-shell">
     <div id="map"></div>
   </div>
@@ -114,6 +116,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
